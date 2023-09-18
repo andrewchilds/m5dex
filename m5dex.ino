@@ -13,6 +13,13 @@
 #define SERVICE_UUID         "ad5eac61-ba3c-45cb-9d32-ca512d71fba4"
 #define CHARACTERISTIC_UUID  "246e55b0-b515-412c-984c-c3bf2fe76553"
 
+constexpr int SCREEN_ROTATION_DEFAULT = 1; // Assuming a placeholder value, replace with your actual value
+const int SCREEN_BRIGHTNESS = 20;
+
+const int DISPLAY_TIMEOUT_IN_MS = 1000 * 20;
+const int MIN_BG_VALUE = 40;
+const int MAX_BG_VALUE = 300;
+
 BLEServer *pServer = NULL;
 BLECharacteristic * pCharacteristic = NULL;
 
@@ -23,7 +30,6 @@ bool shouldDisplayConnectScreen = true;
 int timeAwake = 0;
 int timeSinceLastRender = 0;
 
-int maxVal = 300;
 // int hyper = 250;
 int inRangeUpper = 180;
 int inRangeLower = 70;
@@ -75,24 +81,24 @@ void renderScreen() {
   M5.Lcd.setTextDatum(TL_DATUM);
   M5.Lcd.setTextSize(1);
   M5.Lcd.setTextColor(TFT_LIGHTGREY);
-  M5.Lcd.drawString("300", 212, scaleToScreen(maxVal) - 3);
-  M5.Lcd.drawString("180", 212, scaleToScreen(inRangeUpper) - 3);
-  M5.Lcd.drawString("70", 212, scaleToScreen(inRangeLower) - 3);
+  M5.Lcd.drawString("300", 212, scaleYPos(MAX_BG_VALUE) - 3);
+  M5.Lcd.drawString("180", 212, scaleYPos(inRangeUpper) - 3);
+  M5.Lcd.drawString("70", 212, scaleYPos(inRangeLower) - 3);
 
   // Draw upper line (300)
-  M5.Lcd.drawLine(leftPos, scaleToScreen(maxVal), rightPos, scaleToScreen(maxVal), TFT_DARKGREY);
+  M5.Lcd.drawLine(leftPos, scaleYPos(MAX_BG_VALUE), rightPos, scaleYPos(MAX_BG_VALUE), TFT_DARKGREY);
 
   // 180
-  M5.Lcd.drawLine(leftPos, scaleToScreen(inRangeUpper), rightPos, scaleToScreen(inRangeUpper), ORANGE);
+  M5.Lcd.drawLine(leftPos, scaleYPos(inRangeUpper), rightPos, scaleYPos(inRangeUpper), ORANGE);
 
   // Draw lower line
-  M5.Lcd.drawLine(leftPos, scaleToScreen(inRangeLower), rightPos, scaleToScreen(inRangeLower), RED);
+  M5.Lcd.drawLine(leftPos, scaleYPos(inRangeLower), rightPos, scaleYPos(inRangeLower), RED);
 
   int i = leftPos + 1;
   for (int bgValue : bgValues) {
     int color = getColorFor(bgValue);
-    if (bgValue >= 40) {
-      M5.Lcd.fillCircle(i, scaleToScreen(bgValue), 2, color);
+    if (bgValue >= MIN_BG_VALUE) {
+      M5.Lcd.fillCircle(i, scaleYPos(bgValue), 2, color);
     }
     i += 10;
   }
@@ -149,13 +155,12 @@ void drawArrow() {
   }
 }
 
-float scaleToScreen(float value) {
-  float scaled = scaleLinear(value, 40, maxVal, 130, 48);
-  if (scaled > maxVal) {
-    return maxVal;
-  }
+float scaleYPos(float value) {
+  float capped = value > MAX_BG_VALUE ? MAX_BG_VALUE : value;
+  float topY = 48;
+  float bottomY = 130;
 
-  return scaled;
+  return scaleLinear(capped, MIN_BG_VALUE, MAX_BG_VALUE, bottomY, topY);
 }
 
 // scaleLinear(5, 0, 10, 0, 300) === 150
@@ -320,13 +325,13 @@ void fadeIn() {
   displayOn = true;
   M5.Axp.WakeUpDisplayAfterLightSleep();
   M5.Axp.ScreenBreath(4);
-  delay(25);
+  delay(20);
   M5.Axp.ScreenBreath(8);
-  delay(25);
+  delay(20);
   M5.Axp.ScreenBreath(12);
-  delay(25);
+  delay(20);
   M5.Axp.ScreenBreath(16);
-  delay(25);
+  delay(20);
   M5.Axp.ScreenBreath(20);
   timeAwake = 0;
 }
@@ -334,20 +339,19 @@ void fadeIn() {
 void fadeOut() {
   displayOn = false;
   M5.Axp.ScreenBreath(16);
-  delay(25);
+  delay(20);
   M5.Axp.ScreenBreath(12);
-  delay(25);
+  delay(20);
   M5.Axp.ScreenBreath(8);
-  delay(25);
+  delay(20);
   M5.Axp.ScreenBreath(4);
-  delay(25);
+  delay(20);
   M5.Axp.SetSleep();
-  // M5.Axp.LightSleep(3000); // this doesn't seem to work.
 }
 
 void setup() {
   M5.begin();
-  M5.Axp.ScreenBreath(screenBrightness);
+  M5.Axp.ScreenBreath(SCREEN_BRIGHTNESS);
   renderScreen();
   setupBLE();
 }
@@ -378,7 +382,7 @@ void loop() {
   timeAwake += 100;
   timeSinceLastRender += 100;
 
-  if (timeAwake > (1000 * 15) && displayOn == true) {
+  if (timeAwake > DISPLAY_TIMEOUT_IN_MS && displayOn == true) {
     fadeOut();
   }
 
